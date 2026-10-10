@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connection Test</title>
+    <style>
+        body { font-family: Arial; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
+        input { padding: 10px; font-size: 16px; width: 70%; margin-right: 10px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        #result { margin-top: 20px; padding: 20px; border-radius: 10px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .testing { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+    </style>
+</head>
+<body>
+    <h1>Connection Test</h1>
+    <p>Enter your laptop's IP address:</p>
+    <input type="text" id="ipInput" placeholder="e.g., 192.168.1.100" value="192.168.137.1">
+    <button onclick="testConnection()">Test Connection</button>
+    <div id="result"></div>
+
+    <script>
+        // Try to get IP from URL param
+        const urlParams = new URLSearchParams(window.location.search);
+        const savedIP = urlParams.get('ip');
+        if (savedIP) document.getElementById('ipInput').value = savedIP;
+
+        function testConnection() {
+            const ip = document.getElementById('ipInput').value.trim();
+            if (!ip) return alert('Please enter IP address');
+            
+            const url = `http://${ip}:5000/status`;
+            const result = document.getElementById('result');
+            result.className = 'testing';
+            result.innerHTML = 'Testing connection...';
+            
+            fetch(url, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                mode: 'cors'
+            })
+            .then(response => {
+                if (response.ok) return response.json();
+                throw new Error('HTTP ' + response.status);
+            })
+            .then(data => {
+                result.className = 'success';
+                result.innerHTML = `
+                    SUCCESS!<br>
+                    Devices connected: ${data.devices}<br>
+                    Files received: ${data.files}<br>
+                    Server IP: ${data.server_ip || ip}
+                `;
+            })
+            .catch(err => {
+                result.className = 'error';
+                result.innerHTML = `
+                    FAILED<br>
+                    Error: ${err.message}<br>
+                    <small>Make sure laptop server is running and firewall allows port 5000</small>
+                `;
+            });
+        }
+        
+        // Enter key to test
+        document.getElementById('ipInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') testConnection();
+        });
+    </script>
+</body>
+</html>

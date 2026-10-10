@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gesture Transfer - Camera Receiver</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+               min-height: 100vh; padding-bottom: 20px; }
+        .container { max-width: 460px; margin: 0 auto; padding: 16px; }
+        h1 { color: #fff; font-size: 21px; text-align: center; margin: 8px 0 2px; }
+        .subtitle { color: rgba(255,255,255,.78); font-size: 13px; text-align: center; margin-bottom: 12px; }
+
+        .status-box { background: rgba(255,255,255,.95); border-radius: 16px; padding: 14px;
+                      margin: 12px 0; text-align: center; }
+        .status-badge { display: inline-block; padding: 6px 18px; border-radius: 25px;
+                        font-size: 14px; font-weight: bold; }
+        .online { background: #4CAF50; color: white; }
+        .offline { background: #f44336; color: white; }
+        .connecting { background: #ff9800; color: white; }
+        .status-text { font-size: 13px; margin-top: 6px; color: #555; }
+        .device-id { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+        .ip-row { display: flex; gap: 8px; margin-top: 6px; }
+        .ip-input { flex: 1; padding: 11px; border: 2px solid #ddd; border-radius: 10px;
+                    font-size: 15px; text-align: center; }
+        .btn { color: white; border: none; padding: 12px 16px; border-radius: 12px;
+               font-size: 14px; font-weight: bold; cursor: pointer; transition: transform .15s; }
+        .btn:active { transform: scale(.96); }
+        .btn-primary { background: #667eea; }
+        .btn-success { background: #4CAF50; }
+        .btn-danger { background: #f44336; }
+        .btn-warning { background: #ff9800; }
+        .btn-info { background: #2196F3; }
+        .btn-block { width: 100%; margin-top: 10px; }
+
+        .tab-buttons { display: flex; margin: 14px 0; }
+        .tab-btn { flex: 1; padding: 12px; border: none; background: rgba(255,255,255,.25);
+                   color: #fff; font-weight: bold; cursor: pointer; transition: all .2s; }
+        .tab-btn:first-child { border-radius: 10px 0 0 10px; }
+        .tab-btn:last-child { border-radius: 0 10px 10px 0; }
+        .tab-btn.active { background: #fff; color: #667eea; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .panel { background: rgba(255,255,255,.95); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+        .panel h3 { color: #333; font-size: 15px; margin-bottom: 8px; }
+
+        .camera-stage { position: relative; border-radius: 16px; overflow: hidden; background: #111; width: 100%; }
+        .camera-stage canvas { width: 100%; display: block; border-radius: 16px; }
+        .camera-stage .guide {
+            position: absolute; left: 10px; right: 10px; bottom: 10px; background: rgba(0,0,0,.6);
+            color: #fff; font-size: 12px; padding: 8px 12px; border-radius: 10px; z-index: 5; text-align: center;
+        }
+        .camera-stage .toggle {
+            position: absolute; top: 10px; right: 10px; z-index: 6;
+            background: rgba(0,0,0,.55); color: #fff; border: 1px solid rgba(255,255,255,.4);
+            padding: 8px 12px; border-radius: 20px; font-size: 12px; cursor: pointer;
+        }
+
+        .offer-banner { margin-top: 10px; border-radius: 12px; padding: 12px;
+                        background: #fff3cd; border: 2px solid #ffc107; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,193,7,.5);} 50% { box-shadow: 0 0 0 10px rgba(255,193,7,0);} }
+        .offer-banner .ob-name { font-weight: bold; color: #333; font-size: 14px; word-break: break-all; }
+        .offer-banner .ob-size { color: #888; font-size: 12px; }
+        .offer-row { display: flex; gap: 8px; margin-top: 10px; }
+        .offer-row .btn { flex: 1; }
+
+        .progress-row { margin-top: 10px; display: none; }
+        .progress-track { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+        .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg,#667eea,#764ba2); transition: width .2s; }
+        .progress-label { font-size: 11px; color: #888; margin-top: 3px; text-align: center; }
+
+        .file-list { max-height: 280px; overflow-y: auto; }
+        .file-item { background: #f5f5f5; padding: 10px; margin: 6px 0; border-radius: 10px;
+                     display: flex; justify-content: space-between; align-items: center;
+                     border-left: 4px solid #667eea; gap: 8px; }
+        .file-info { display: flex; flex-direction: column; min-width: 0; }
+        .file-name { font-weight: 600; color: #333; font-size: 13px; word-break: break-all; }
+        .file-size { font-size: 11px; color: #888; }
+        .file-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .file-actions .btn { padding: 8px 10px; font-size: 11px; border-radius: 8px; }
+
+        .upload-area { border: 2px dashed #667eea; border-radius: 14px; padding: 24px 14px; margin: 10px 0;
+                       background: #fafafa; text-align: center; transition: all .3s; color: #666; }
+        .upload-area.dragover { background: #e8eaff; border-color: #4CAF50; }
+        .upload-icon { font-size: 40px; }
+        .upload-text { font-size: 13px; }
+
+        .notification { position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+                        background: rgba(0,0,0,.88); color: white; padding: 12px 22px; border-radius: 12px;
+                        z-index: 1000; max-width: 90%; text-align: center; font-size: 13px;
+                        animation: slideDown .4s ease; }
+        @keyframes slideDown { from { top: -80px; opacity: 0; } to { top: 14px; opacity: 1; } }
+        .pill { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+        .pill.pending { background: #ff9800; color: #fff; }
+        .pill.accepted { background: #4CAF50; color: #fff; }
+        .pill.declined { background: #f44336; color: #fff; }
+        #offerList { margin-top: 10px; }
+        .offer-item { background: #fff8e1; border: 1px solid #ffe082; border-radius: 10px; padding: 10px; margin: 6px 0; font-size: 13px; color: #555; }
+        .gesture-legend { font-size: 12px; color: #555; line-height: 1.7; margin-top: 8px;
+                          background: #eef; padding: 10px; border-radius: 10px; }
+        .gesture-legend b { color: #333; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gesture Transfer - Receiver</h1>
+        <p class="subtitle">Camera + gesture to accept files from the laptop</p>
+
+        <div class="status-box">
+            <div class="ip-row">
+                <input type="text" id="serverIp" class="ip-input" placeholder="Laptop IP (e.g. 192.168.1.100)">
+                <button class="btn btn-primary" onclick="connectToServer()">Connect</button>
+            </div>
+            <div style="margin-top:10px;">
+                <span class="status-badge offline" id="statusBadge">OFFLINE</span>
+            </div>
+            <p class="status-text" id="statusText">Not connected</p>
+            <div class="device-id" id="deviceId"></div>
+        </div>
+
+        <div class="tab-buttons">
+            <button class="tab-btn active" id="tabGesture" onclick="switchTab('gesture')">Camera Gesture</button>
+            <button class="tab-btn" id="tabFiles" onclick="switchTab('files')">Files</button>
+            <button class="tab-btn" id="tabSend" onclick="switchTab('send')">Send</button>
+        </div>
+
+        <!-- GESTURE / CAMERA ACCEPT TAB -->
+        <div class="tab-content active" id="contentGesture">
+            <div class="panel">
+                <h3>Camera acceptance zone</h3>
+                <div class="camera-stage" id="cameraStage">
+                    <video id="video" playsinline autoplay muted style="display:none;"></video>
+                    <canvas id="canvas"></canvas>
+                    <button class="toggle" id="camToggle" onclick="toggleCamera()">Start Camera</button>
+                    <div class="guide" id="camGuide">Start camera, then when a file arrives, hold an OPEN PALM over the + to accept.</div>
+                </div>
+
+                <div id="currentOffer">
+                    <div class="offer-banner">
+                        <div class="ob-name" id="offerName">No incoming file</div>
+                        <div class="ob-size" id="offerSize"></div>
+                        <div class="progress-row" id="dlProgress">
+                            <div class="progress-track"><div class="progress-bar" id="dlBar"></div></div>
+                            <div class="progress-label" id="dlLabel"></div>
+                        </div>
+                        <div class="offer-row" id="offerButtons">
+                            <button class="btn btn-success" onclick="acceptOffer()">Accept</button>
+                            <button class="btn btn-danger" onclick="declineOffer()">Decline</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="offerList"></div>
+                <div class="gesture-legend">
+                    <b>How to accept (gesture):</b><br>
+                    1. Camera is on, you will see a <b>+</b> accept zone.<br>
+                    2. Laptop sends a file -> it shows above the +.<br>
+                    3. Hold an <b>open palm</b> over the <b>+</b> until it turns green -> file downloads automatically.<br>
+                    <b>Fallback:</b> tap the Accept button.
+                </div>
+            </div>
+        </div>
+
+        <!-- FILES TAB -->
+        <div class="tab-content" id="contentFiles">
+            <div class="panel">
+                <h3>Received files (download anytime)</h3>
+                <div class="file-list" id="filesContainer"><p style="color:#888; font-size:13px;">No files yet</p></div>
+                <button class="btn btn-warning btn-block" onclick="refreshFiles()">Refresh</button>
+            </div>
+        </div>
+
+        <!-- SEND TAB -->
+        <div class="tab-content" id="contentSend">
+            <div class="panel">
+                <h3>Send files to laptop</h3>
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">+</div>
+                    <p class="upload-text">Tap to choose files from this phone</p>
+                    <input type="file" id="fileInput" multiple style="display:none;" onchange="handleFileSelect(event)">
+                </div>
+                <div id="selectedFiles" class="hidden">
+                    <div class="file-list" id="selectedFilesList"></div>
+                    <button class="btn btn-success btn-block" onclick="uploadFiles()">Upload to Laptop</button>
+                    <button class="btn btn-warning btn-block" onclick="clearSelection()">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ================= GLOBALS ================= */
+        const qs = new URLSearchParams(window.location.search);
+        const qip = qs.get('ip');
+        let deviceId = 'android_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        let serverIP = (qip || localStorage.getItem('serverIP') || '192.168.137.1').trim();
+        let isConnected = false;
+        let reconnectInterval = null;
+        let statusCheckInterval = null;
+        let offerPollInterval = null;
+
+        let video = document.getElementById('video');
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let stream = null;
+        let camOn = false;
+        let handsReady = false;
+        let handsBase = '';
+
+        let offers = [];
+        let pendingOffer = null;   // offer currently being accepted/downloaded
+        let acceptFrames = 0;
+        let selectedFiles = [];
+        let currentGesture = '';
+
+        document.getElementById('serverIp').value = serverIP;
+
+        /* ================= CONNECTION ================= */
+        function connectToServer() {
+            const ip = document.getElementById('serverIp').value.trim();
+            if (!ip) { showNotification('Please enter laptop IP'); return; }
+            localStorage.setItem('serverIP', ip);
+            serverIP = ip;
+            const serverUrl = `http://${ip}:5000`;
+            setBadge('connecting', 'CONNECTING', 'Connecting to laptop...');
+
+            fetch(`${serverUrl}/status`, { headers: { 'Accept': 'application/json' }, mode: 'cors' })
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(() => fetch(`${serverUrl}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ id: deviceId, name: 'Android Phone', type: 'mobile' })
+                }))
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(() => {
+                    isConnected = true;
+                    setBadge('online', 'ONLINE', 'Connected to laptop. Ready for gesture transfer.');
+                    document.getElementById('deviceId').textContent = 'Device ID: ' + deviceId;
+                    showNotification('Connected to laptop');
+                    if (reconnectInterval) clearInterval(reconnectInterval);
+                    if (statusCheckInterval) clearInterval(statusCheckInterval);
+                    if (offerPollInterval) clearInterval(offerPollInterval);
+                    reconnectInterval = setInterval(refreshFiles, 5000);
+                    statusCheckInterval = setInterval(checkConnection, 10000);
+                    offerPollInterval = setInterval(refreshOffers, 3000);
+                    refreshFiles();
+                    refreshOffers();
+                    setupSSE();
+                    startCamera('environment');
+                })
+                .catch(err => {
+                    isConnected = false;
+                    setBadge('offline', 'OFFLINE', 'Connection failed: ' + err.message);
+                    document.getElementById('deviceId').textContent = '';
+                    showNotification('Connection failed! Check the laptop IP');
+                    if (reconnectInterval) clearInterval(reconnectInterval);
+                    reconnectInterval = setInterval(() => { if (!isConnected) connectToServer(); }, 10000);
+                });
+        }
+
+        function checkConnection() {
+            if (!isConnected) return;
+            fetch(`http://${serverIP}:5000/status`, { headers: { 'Accept': 'application/json' }, mode: 'cors' })
+                .catch(() => {
+                    isConnected = false;
+                    setBadge('offline', 'OFFLINE', 'Connection lost. Reconnecting...');
+                    connectToServer();
+                });
+        }
+
+        function setBadge(cls, label, text) {
+            const b = document.getElementById('statusBadge');
+            b.textContent = label;
+            b.className = 'status-badge ' + cls;
+            document.getElementById('statusText').textContent = text;
+        }
+
+        /* ================= SSE (live push) ================= */
+        function setupSSE() {
+            try {
+                const es = new EventSource(`http://${serverIP}:5000/events`);
+                es.addEventListener('offer', () => refreshOffers());
+                es.addEventListener('offer_status', () => refreshOffers());
+                es.addEventListener('laptop_state', (e) => {
+                    const d = JSON.parse(e.data || '{}');
+                    if (d.event === 'dropped') showNotification('Laptop dropped: ' + (d.file || 'file'));
+                });
+            } catch (e) { /* SSE optional */ }
+        }
+
+        /* ================= OFFERS ================= */
+        function refreshOffers() {
+            if (!isConnected) return;
+            fetch(`http://${serverIP}:5000/offers?id=${deviceId}`)
+                .then(r => r.json())
+                .then(data => {
+                    offers = data.offers || [];
+                    const active = offers.find(o => o.status === 'pending');
+                    if (active) {
+                        setOfferUI(active);
+                    } else if (!pendingOffer) {
+                        clearOfferUI();
+                    }
+                    renderOfferList();
+                })
+                .catch(() => {});
+        }
+
+        function setOfferUI(offer) {
+            pendingOffer = offer;
+            document.getElementById('offerName').textContent = 'Incoming: ' + offer.filename;
+            const kb = (offer.size / 1024).toFixed(1);
+            document.getElementById('offerSize').textContent = kb < 1024 ? kb + ' KB' : (kb / 1024).toFixed(1) + ' MB';
+            document.getElementById('offerButtons').classList.remove('hidden');
+            showNotification('File offer received: ' + offer.filename + '  |  Hold OPEN PALM on the + to accept');
+        }
+
+        function clearOfferUI() {
+            pendingOffer = null;
+            document.getElementById('offerName').textContent = 'No incoming file';
+            document.getElementById('offerSize').textContent = '';
+            document.getElementById('offerButtons').classList.add('hidden');
+            document.getElementById('dlProgress').style.display = 'none';
+        }
+
+        function renderOfferList() {
+            const el = document.getElementById('offerList');
+            if (!offers.length) { el.innerHTML = ''; return; }
+            el.innerHTML = offers.map(o =>
+                `<div class="offer-item">📬 <b>${o.filename}</b> <span class="pill ${o.status}">${o.status}</span></div>`
+            ).join('');
+        }
+
+        function acceptOffer() {
+            if (!pendingOffer) return;
+            const oid = pendingOffer.id;
+            document.getElementById('offerButtons').classList.add('hidden');
+            setDLProgress(0, 'Accepting...');
+            fetch(`http://${serverIP}:5000/accept_offer/${oid}`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'accepted') {
+                        downloadFile(`http://${serverIP}:5000${data.url}`, data.filename);
+                    } else if (data.url) {
+                        downloadFile(`http://${serverIP}:5000${data.url}`, data.filename);
+                    } else {
+                        toast('Could not accept offer');
+                        clearOfferUI();
+                    }
+                })
+                .catch(() => { toast('Accept failed'); clearOfferUI(); });
+        }
+
+        function declineOffer() {
+            if (!pendingOffer) return;
+            const oid = pendingOffer.id;
+            fetch(`http://${serverIP}:5000/decline_offer/${oid}`, { method: 'POST' }).catch(() => {});
+            showNotification('Offer declined');
+            clearOfferUI();
+            refreshOffers();
+        }
+
+        /* ================= DOWNLOAD WITH PROGRESS ================= */
+        function downloadFile(url, filename) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.responseType = 'blob';
+            xhr.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    setDLProgress(pct, `Downloading ${(e.loaded / 1024 / 1024).toFixed(1)} / ${(e.total / 1024 / 1024).toFixed(1)} MB`);
+                }
+            };
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    const blob = xhr.response;
+                    const a = document.createElement('a');
+                    const urlObj = URL.createObjectURL(blob);
+                    a.href = urlObj;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(() => URL.revokeObjectURL(urlObj), 4000);
+                    toast('File downloaded: ' + filename);
+                    showNotification('File received: ' + filename);
+                    clearOfferUI();
+                    refreshOffers();
+                    refreshFiles();
+                } else { toast('Download failed'); clearOfferUI(); }
+            };
+            xhr.onerror = () => { toast('Download error'); clearOfferUI(); };
+            xhr.send();
+        }
+
+        function setDLProgress(pct, label) {
+            document.getElementById('dlProgress').style.display = 'block';
+            document.getElementById('dlBar').style.width = pct + '%';
+            document.getElementById('dlLabel').textContent = label || (pct + '%');
+        }
+
+        /* ================= CAMERA + GESTURE ACCEPT ================= */
+        function toggleCamera() {
+            if (camOn) stopCamera(); else startCamera('environment');
+        }
+        function stopCamera() {
+            if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+            camOn = false;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('camToggle').textContent = 'Start Camera';
+            document.getElementById('camGuide').textContent = 'Camera stopped. Start it to accept via gesture.';
+        }
+        function startCamera(facingMode) {
+            const constraints = { video: { facingMode: facingMode || 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(s => {
+                    stream = s;
+                    video.srcObject = s;
+                    camOn = true;
+                    document.getElementById('camToggle').textContent = 'Stop Camera';
+                    document.getElementById('camGuide').textContent = 'Ready for gesture accept (GEST_READY)';
+                    video.play().catch(() => {});
+                    video.onloadedmetadata = () => {
+                        canvas.width = video.videoWidth || 640;
+                        canvas.height = video.videoHeight || 480;
+                        initHands();
+                    };
+                })
+                .catch(() => {
+                    if (facingMode === 'environment') { startCamera('user'); return; }
+                    document.getElementById('camGuide').textContent = 'Camera unavailable/denied. Use the Accept button instead.';
+                });
+        }
+
+        function loadScript(src) {
+            return new Promise((res, rej) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = res;
+                s.onerror = () => rej(new Error('load failed: ' + src));
+                document.head.appendChild(s);
+            });
+        }
+
+        async function initHands() {
+            if (handsReady) return;
+            if (typeof window.Hands !== 'undefined') { handsReady = true; setupHands(); return; }
+            const bases = [
+                `${window.location.origin}/static/hands/`,
+                'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/'
+            ];
+            for (const base of bases) {
+                try {
+                    await loadScript(base + 'hands.js');
+                    await loadScript(base + 'hands_solution_packed_assets_loader.js');
+                    handsBase = base;
+                    handsReady = true;
+                    setupHands();
+                    return;
+                } catch (e) { console.warn('Hand tracking lib failed on ' + base); }
+            }
+            document.getElementById('camGuide').textContent = 'Hand tracking unavailable - use the Accept button.';
+        }
+
+        function setupHands() {
+            const hands = new window.Hands({ locateFile: (file) => handsBase + file });
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.5
+            });
+            hands.onResults((results) => {
+                const cw = canvas.width, ch = canvas.height;
+                ctx.save();
+                ctx.translate(cw, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, cw, ch);
+                ctx.restore();
+
+                const zoneX = cw - Math.max(70, cw * 0.13);
+                const zoneY = ch / 2;
+                const zoneR = Math.max(60, ch * 0.18);
+
+                let gesture = { openPalm: false, pinch: false, cursor: null, ext: 0 };
+
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length) {
+                    const lm = results.multiHandLandmarks[0].landmark;
+                    gesture = computeGesture(lm);
+
+                    const pts = lm.map(p => [(1 - p.x) * cw, p.y * ch]);
+                    for (const conn of HAND_CONNS) {
+                        ctx.beginPath();
+                        ctx.moveTo(pts[conn[0]][0], pts[conn[0]][1]);
+                        ctx.lineTo(pts[conn[1]][0], pts[conn[1]][1]);
+                        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                    if (gesture.cursor) {
+                        const cx = (1 - gesture.cursor[0]) * cw, cy = gesture.cursor[1] * ch;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+                        ctx.fillStyle = gesture.openPalm ? '#00e676' : '#ffeb3b';
+                        ctx.fill();
+                    }
+                }
+
+                const cursorMirror = gesture.cursor ? [(1 - gesture.cursor[0]) * cw, gesture.cursor[1] * ch] : null;
+                const inZone = cursorMirror &&
+                    Math.hypot(cursorMirror[0] - zoneX, cursorMirror[1] - zoneY) <= zoneR;
+
+                currentGesture = gesture.openPalm ? 'OPEN PALM' : (gesture.pinch ? 'PINCH' : 'HAND');
+
+                // -> gesture accept
+                if (pendingOffer && gesture.openPalm && inZone) {
+                    acceptFrames++;
+                    if (acceptFrames >= 12) { acceptFrames = 0; acceptOffer(); }
+                } else {
+                    acceptFrames = 0;
+                }
+
+                // Draw the + accept zone
+                const zc = pendingOffer ? (inZone && gesture.openPalm ? '#00e676' : '#20d08a') : '#35d0e6';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(zoneX, zoneY, zoneR, 0, Math.PI * 2);
+                ctx.strokeStyle = zc;
+                ctx.stroke();
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(zoneX - 30, zoneY); ctx.lineTo(zoneX + 30, zoneY);
+                ctx.moveTo(zoneX, zoneY - 30); ctx.lineTo(zoneX, zoneY + 30);
+                ctx.strokeStyle = zc;
+                ctx.stroke();
+
+                const label = pendingOffer
+                    ? 'ACCEPT HERE - OPEN PALM' + (inZone ? ' ✓' : '')
+                    : 'ACCEPT ZONE';
+                ctx.fillStyle = zc;
+                ctx.font = 'bold 14px Segoe UI, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(label, zoneX, zoneY - zoneR - 14);
+
+                // seek frames
+                if (camOn) requestAnimationFrame(sendToHands);
+            });
+
+            window.__hands = hands;
+            if (camOn) requestAnimationFrame(sendToHands);
+        }
+
+        function sendToHands() {
+            if (camOn && handsReady && video.readyState >= 2 && video.videoWidth > 0) {
+                try { window.__hands.send({ image: video }); } catch (e) {}
+            } else if (camOn && handsReady) {
+                requestAnimationFrame(sendToHands);
+            }
+        }
+
+        const HAND_CONNS = [
+            [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+            [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]
+        ];
+
+        function computeGesture(lm) {
+            const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+            const indexUp = lm[8].y < lm[6].y;
+            const middleUp = lm[12].y < lm[10].y;
+            const ringUp = lm[16].y < lm[14].y;
+            const pinkyUp = lm[20].y < lm[18].y;
+            const thumbExt = Math.abs(lm[4].x - lm[3].x) > 0.05;
+            const ext = (indexUp ? 1 : 0) + (middleUp ? 1 : 0) + (ringUp ? 1 : 0) + (pinkyUp ? 1 : 0) + (thumbExt ? 1 : 0);
+            return { openPalm: ext >= 4, pinch: pinchDist < 0.075, cursor: [lm[8].x, lm[8].y], ext };
+        }
+
+        /* ================= TABS ================= */
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            if (tab === 'gesture') {
+                document.getElementById('tabGesture').classList.add('active');
+                document.getElementById('contentGesture').classList.add('active');
+            } else if (tab === 'files') {
+                document.getElementById('tabFiles').classList.add('active');
+                document.getElementById('contentFiles').classList.add('active');
+            } else {
+                document.getElementById('tabSend').classList.add('active');
+                document.getElementById('contentSend').classList.add('active');
+            }
+        }
+
+        /* ================= FILES ================= */
+        function refreshFiles() {
+            if (!isConnected) return;
+            fetch(`http://${serverIP}:5000/list_shared`)
+                .then(r => r.json())
+                .then(data => {
+                    const c = document.getElementById('filesContainer');
+                    if (data.files && data.files.length) {
+                        c.innerHTML = data.files.map(f => {
+                            const kb = (f.size / 1024).toFixed(1);
+                            const size = kb < 1024 ? kb + ' KB' : (kb / 1024).toFixed(1) + ' MB';
+                            return `<div class="file-item">
+                                <div class="file-info"><span class="file-name">📄 ${f.name}</span><span class="file-size">${size}</span></div>
+                                <div class="file-actions"><button class="btn btn-success" onclick="downloadFile('http://${serverIP}:5000${f.url}', '${f.name.replace(/'/g, '')}')">⬇</button></div>
+                            </div>`;
+                        }).join('');
+                    } else {
+                        c.innerHTML = '<p style="color:#888; font-size:13px;">No files available yet</p>';
+                    }
+                }).catch(() => {});
+        }
+
+        /* ================= UPLOAD (phone -> laptop) ================= */
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', (e) => { e.preventDefault(); uploadArea.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+
+        function handleFileSelect(e) { handleFiles(e.target.files); }
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files);
+            if (selectedFiles.length) {
+                document.getElementById('selectedFiles').classList.remove('hidden');
+                document.getElementById('selectedFilesList').innerHTML = selectedFiles.map((f, i) =>
+                    `<div class="file-item"><div class="file-info"><span class="file-name">📄 ${f.name}</span><span class="file-size">${(f.size/1024).toFixed(1)} KB</span></div>
+                     <button class="btn btn-danger" onclick="removeFile(${i})">✕</button></div>`
+                ).join('');
+            }
+        }
+
+        function removeFile(i) {
+            selectedFiles.splice(i, 1);
+            if (selectedFiles.length) {
+                document.getElementById('selectedFilesList').innerHTML = selectedFiles.map((f, i) =>
+                    `<div class="file-item"><div class="file-info"><span class="file-name">📄 ${f.name}</span><span class="file-size">${(f.size/1024).toFixed(1)} KB</span></div>
+                     <button class="btn btn-danger" onclick="removeFile(${i})">✕</button></div>`
+                ).join('');
+            } else {
+                document.getElementById('selectedFiles').classList.add('hidden');
+                fileInput.value = '';
+            }
+        }
+
+        function clearSelection() { selectedFiles = []; document.getElementById('selectedFiles').classList.add('hidden'); fileInput.value = ''; }
+
+        function uploadFiles() {
+            if (!selectedFiles.length || !isConnected) { showNotification('Select files and connect first'); return; }
+            let remaining = selectedFiles.length;
+            selectedFiles.forEach((file, idx) => {
+                const xhr = new XMLHttpRequest();
+                const fd = new FormData();
+                fd.append('file', file);
+                xhr.open('POST', `http://${serverIP}:5000/upload`, true);
+                xhr.onload = () => {
+                    remaining--;
+                    if (xhr.status === 200) toast('Uploaded: ' + file.name);
+                    else toast('Upload failed: ' + file.name);
+                    if (remaining === 0) { clearSelection(); refreshFiles(); showNotification('Upload complete'); }
+                };
+                xhr.onerror = () => { remaining--; toast('Upload error: ' + file.name); };
+                xhr.send(fd);
+            });
+        }
+
+        /* ================= TOASTS ================= */
+        function toast(msg) {
+            showNotification(msg);
+        }
+        function showNotification(message) {
+            const notif = document.createElement('div');
+            notif.className = 'notification';
+            notif.textContent = message;
+            document.body.appendChild(notif);
+            setTimeout(() => { if (notif.parentNode) notif.remove(); }, 4500);
+        }
+
+        /* ================= BOOT ================= */
+        window.onload = function () {
+            setTimeout(connectToServer, 800);
+            switchTab('gesture');
+        };
+    </script>
+</body>
+</html>

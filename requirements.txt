@@ -1,0 +1,10 @@
+# GestureTransfer server dependencies
+# NOTE: mediapipe is pinned to 0.10.x because the code uses the legacy
+# mp.solutions Hands API (removed in mediapipe 1.x). opencv is pinned to the
+# 4.8 line to stay compatible with numpy<2, which mediapipe 0.10 requires.
+flask>=2.3
+flask-cors>=4.0
+opencv-python-headless==4.8.1.78
+mediapipe==0.10.21
+numpy<2
+qrcode>=7.4
