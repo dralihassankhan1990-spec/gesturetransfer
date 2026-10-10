@@ -1,0 +1,7 @@
+{
+  "name": "GestureFlow",
+  "description": "A touchless interface featuring a gesture-controlled particle physics engine and image carousel.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
